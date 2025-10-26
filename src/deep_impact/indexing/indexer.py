@@ -40,11 +40,14 @@ class Indexer:
 
             input_ids = torch.tensor([x.ids for x in batch_encoded], dtype=torch.long).to(DEVICE)
             attention_mask = torch.tensor([x.attention_mask for x in batch_encoded], dtype=torch.long).to(DEVICE)
+
+            # Handle token_type_ids (BERT uses them, ModernBERT doesn't)
+            # ModernBERT forward() accepts token_type_ids=None, so it's safe to always pass
             type_ids = torch.tensor([x.type_ids for x in batch_encoded], dtype=torch.long).to(DEVICE)
 
-            # ------------------ DeepImpact ------------------
+            # ------------------ DeepImpact / ModernDeepImpact ------------------
             outputs = self.model(input_ids, attention_mask, type_ids)
-            # ---------------------------------------------------
+            # -------------------------------------------------------------------
 
             # ------------------ DeepPairwiseImpact ------------------
             # pairwise_indices = [

@@ -66,10 +66,10 @@ soupsieve==2.4.1
 statsmodels==0.14.0
 sympy==1.12
 threadpoolctl==3.2.0
-tokenizers==0.13.3
+tokenizers>=0.15.0
 torch==2.0.1
 tqdm==4.65.0
-transformers==4.30.2
+transformers>=4.48.0
 trec-car-tools==2.6
 triton==2.0.0
 typing_extensions==4.7.1

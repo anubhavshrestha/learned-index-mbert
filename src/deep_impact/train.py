@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from src.deep_impact.models import DeepImpact, DeepPairwiseImpact, DeepImpactCrossEncoder
+from src.deep_impact.models import DeepImpact, DeepPairwiseImpact, DeepImpactCrossEncoder, ModernDeepImpact
 from src.deep_impact.training import Trainer, PairwiseTrainer, CrossEncoderTrainer, DistilTrainer, \
     InBatchNegativesTrainer
 from src.deep_impact.training.distil_trainer import DistilMarginMSE, DistilKLLoss
@@ -100,23 +100,24 @@ def run(
         in_batch_negatives: bool = False,
         start_with: Union[str, Path] = None,
         qrels_path: Union[str, Path] = None,
-        eval_every: int = 500
+        eval_every: int = 500,
+        use_modernbert: bool = False
 ):
-    # DeepImpact
-    model_cls = DeepImpact
+    # DeepImpact - Choose BERT or ModernBERT
+    model_cls = ModernDeepImpact if use_modernbert else DeepImpact
     trainer_cls = Trainer
-    collate_function = partial(collate_fn, model_cls=DeepImpact, max_length=max_length)
+    collate_function = partial(collate_fn, model_cls=model_cls, max_length=max_length)
     dataset_cls = MSMarcoTriples
 
     # Pairwise
     if pairwise:
-        model_cls = DeepPairwiseImpact
+        model_cls = DeepPairwiseImpact  # TODO: Create ModernDeepPairwiseImpact variant
         trainer_cls = PairwiseTrainer
         collate_function = partial(collate_fn, model_cls=DeepPairwiseImpact, max_length=max_length)
 
     # CrossEncoder
     elif cross_encoder:
-        model_cls = DeepImpactCrossEncoder
+        model_cls = DeepImpactCrossEncoder  # TODO: Create ModernDeepImpactCrossEncoder variant
         trainer_cls = CrossEncoderTrainer
         collate_function = cross_encoder_collate_fn
 
@@ -199,7 +200,8 @@ if __name__ == "__main__":
     parser.add_argument("--in_batch_negatives", action="store_true", help="Use in-batch negatives")
     parser.add_argument("--start_with", type=Path, default=None, help="Start training with this checkpoint")
     parser.add_argument("--eval_every", type=int, default=500, help="Evaluate every n steps")
-    
+    parser.add_argument("--use_modernbert", action="store_true", help="Use ModernBERT instead of BERT (22 layers, 1024 context, RoPE)")
+
 
     # required for distillation loss with Margin MSE
     parser.add_argument("--qrels_path", type=Path, default=None, help="Path to the qrels file")
