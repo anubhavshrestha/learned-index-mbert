@@ -248,16 +248,31 @@ class ModernDeepImpact(ModernBertPreTrainedModel):
         :param checkpoint_path: Optional path to a trained checkpoint
         :return: Loaded model
         """
-        # Use Alibaba's retrieval-optimized ModernBERT as base
-        model = cls.from_pretrained('Alibaba-NLP/gte-modernbert-base')
+        if checkpoint_path is not None and not os.path.exists(checkpoint_path):
+            # checkpoint_path is a HuggingFace model ID for full ModernDeepImpact
+            model = cls.from_pretrained(checkpoint_path)
+        else:
+            # Load pretrained ModernBERT backbone FIRST, then add the head
+            # This ensures pretrained weights actually load (not randomly initialized)
+            from transformers import ModernBertConfig
 
-        if checkpoint_path is not None:
-            if os.path.exists(checkpoint_path):
-                # Load our trained weights on top of the base model
+            print("Loading pretrained ModernBERT backbone from Alibaba-NLP/gte-modernbert-base...")
+            config = ModernBertConfig.from_pretrained('Alibaba-NLP/gte-modernbert-base')
+            pretrained_modernbert = ModernBertModel.from_pretrained('Alibaba-NLP/gte-modernbert-base')
+
+            # Create ModernDeepImpact with the config
+            model = cls(config)
+
+            # Copy pretrained weights to the modernbert backbone
+            model.modernbert.load_state_dict(pretrained_modernbert.state_dict())
+
+            print("✓ Loaded pretrained ModernBERT weights (22 layers)")
+            print("✓ impact_score_encoder initialized randomly (will be trained)")
+
+            if checkpoint_path is not None:
+                # Load our trained weights (both backbone and head)
                 ModelCheckpoint.load(model=model, last_checkpoint_path=checkpoint_path)
-            else:
-                # checkpoint_path is a HuggingFace model ID
-                model = cls.from_pretrained(checkpoint_path)
+                print(f"✓ Loaded trained checkpoint from {checkpoint_path}")
 
         # Configure tokenizer for our max_length
         cls.tokenizer.enable_truncation(max_length=cls.max_length, strategy='longest_first')
