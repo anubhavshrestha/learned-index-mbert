@@ -40,9 +40,11 @@ class DistilKLLoss:
         self.loss = torch.nn.KLDivLoss(reduction="none")
 
     def __call__(self, output, target):
-        student_scores = torch.log_softmax(output, dim=1)
-        teacher_scores = torch.softmax(target, dim=1)
-        return self.loss(student_scores, teacher_scores).sum(dim=1).mean(dim=0)
+        # Compute the KL divergence in float32 to avoid FP16 overflow/underflow issues.
+        student_log_probs = torch.log_softmax(output.float(), dim=1)
+        teacher_probs = torch.softmax(target.float(), dim=1)
+        loss = self.loss(student_log_probs, teacher_probs).sum(dim=1).mean(dim=0)
+        return loss.to(output.dtype)
 
 
 class DistilTrainer(Trainer):
