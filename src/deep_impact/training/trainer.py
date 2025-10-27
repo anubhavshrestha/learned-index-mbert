@@ -156,8 +156,21 @@ class Trainer:
         input_ids, attention_mask, type_ids = self.get_input_tensors(batch['encoded_list'], target_length)
         document_term_scores = self.model(input_ids, attention_mask, type_ids)
 
+        # DEBUG: Check for NaN in model output
+        if torch.isnan(document_term_scores).any() or torch.isinf(document_term_scores).any():
+            print(f"WARNING: document_term_scores contains NaN/Inf!")
+            print(f"document_term_scores stats: min={document_term_scores.min()}, max={document_term_scores.max()}, mean={document_term_scores.mean()}")
+
         masks = batch['masks'].to(self.gpu_id)
-        return (masks * document_term_scores).sum(dim=1).squeeze(-1).view(self.batch_size, -1)
+        outputs = (masks * document_term_scores).sum(dim=1).squeeze(-1).view(self.batch_size, -1)
+
+        # DEBUG: Check for NaN in final outputs
+        if torch.isnan(outputs).any() or torch.isinf(outputs).any():
+            print(f"WARNING: outputs contains NaN/Inf after masking!")
+            print(f"outputs: {outputs}")
+            print(f"masks sum: {masks.sum()}")
+
+        return outputs
 
     def evaluate_loss(self, outputs, batch):
         labels = torch.zeros(self.batch_size, dtype=torch.long).to(self.gpu_id)

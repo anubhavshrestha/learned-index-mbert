@@ -44,6 +44,10 @@ class DistilKLLoss:
         student_log_probs = torch.log_softmax(output.float(), dim=1)
         teacher_probs = torch.softmax(target.float(), dim=1)
         loss = self.loss(student_log_probs, teacher_probs).sum(dim=1).mean(dim=0)
+
+        # When autocast runs in half precision, keep the loss in float32 for stability.
+        if output.dtype == torch.float16:
+            return loss
         return loss.to(output.dtype)
 
 
