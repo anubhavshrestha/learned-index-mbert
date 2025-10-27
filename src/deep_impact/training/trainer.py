@@ -127,15 +127,33 @@ class Trainer:
 
             self.checkpoint_callback.save('final')
 
-    def get_input_tensors(self, encoded_list):
-        input_ids = torch.tensor([x.ids for x in encoded_list], dtype=torch.long).to(self.gpu_id)
-        attention_mask = torch.tensor([x.attention_mask for x in encoded_list], dtype=torch.long).to(
-            self.gpu_id)
-        type_ids = torch.tensor([x.type_ids for x in encoded_list], dtype=torch.long).to(self.gpu_id)
+    def get_input_tensors(self, encoded_list, target_length: int = None):
+        # Tokenizers can occasionally emit variable-length encodings if padding is disabled
+        # (for example when worker processes are initialised before padding is configured).
+        # To make the training loop robust we pad everything in Python before sending to GPU.
+        if target_length is None:
+            max_len = max(len(enc.ids) for enc in encoded_list)
+        else:
+            max_len = target_length
+
+        input_ids = torch.zeros((len(encoded_list), max_len), dtype=torch.long)
+        attention_mask = torch.zeros((len(encoded_list), max_len), dtype=torch.long)
+        type_ids = torch.zeros((len(encoded_list), max_len), dtype=torch.long)
+
+        for i, enc in enumerate(encoded_list):
+            length = len(enc.ids)
+            input_ids[i, :length] = torch.tensor(enc.ids, dtype=torch.long)
+            attention_mask[i, :length] = torch.tensor(enc.attention_mask, dtype=torch.long)
+            type_ids[i, :length] = torch.tensor(enc.type_ids, dtype=torch.long)
+
+        input_ids = input_ids.to(self.gpu_id)
+        attention_mask = attention_mask.to(self.gpu_id)
+        type_ids = type_ids.to(self.gpu_id)
         return input_ids, attention_mask, type_ids
 
     def get_output_scores(self, batch):
-        input_ids, attention_mask, type_ids = self.get_input_tensors(batch['encoded_list'])
+        target_length = batch['masks'].shape[1]
+        input_ids, attention_mask, type_ids = self.get_input_tensors(batch['encoded_list'], target_length)
         document_term_scores = self.model(input_ids, attention_mask, type_ids)
 
         masks = batch['masks'].to(self.gpu_id)
